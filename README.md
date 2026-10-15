@@ -2,7 +2,10 @@
 
 作成: 2026-10-12　対象: 小学生　目的: 漢検（10級〜2級）の合格を軸に、読み・書き・書き順を試験形式で反復し、忘れないようにする。物語はサブ機能。
 
-公開URL: https://claude.ai/artifact/DFr5ncWzi6k9nQueQ7PqqC（iPad Safari →「ホーム画面に追加」）
+公開URL（正式・iPad用）: https://ngtysyk0140-boop.github.io/kanji-reader/ （GitHub Pages、第一者サイトなので iPad のホーム画面アプリでも記録が残る）
+旧URL: https://claude.ai/artifact/DFr5ncWzi6k9nQueQ7PqqC （claude.ai 埋め込み。iPad Safari では保存が消えることがあるため子ども用には使わない）
+
+更新手順: `python3 tools/build_site.py` → `git add -A && git commit && git push`（docs/ が公開される。反映まで1〜2分）
 ローカル: `index.html` をブラウザで開くだけ（サーバー不要）。
 
 ## 級の構成
