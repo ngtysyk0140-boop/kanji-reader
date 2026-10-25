@@ -155,11 +155,21 @@ textarea{width:100%;min-height:100px;line-height:1.7}
 .story .m{font-size:12px;color:var(--sub);margin-top:4px}
 .timer{font-variant-numeric:tabular-nums;font-weight:700}
 pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-space:pre-wrap;line-height:1.6}
+
+.picker{position:fixed;inset:0;z-index:50;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
+.picker.on{display:flex}
+.picker h1{font-size:26px;margin:0 0 6px;font-family:var(--font-kana, var(--font-text));text-align:center}
+.picker .who{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+.picker button{border:3px solid var(--line);background:var(--card);border-radius:28px;width:min(40vw,200px);aspect-ratio:1;font-size:28px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 0 rgba(0,0,0,.06)}
+.picker button span{font-size:64px}
+.picker button.rei{border-color:#f7c6d0}.picker button.ru{border-color:#a9d6f3}
+.whochip{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:5px 12px;font-weight:800;font-size:14px}
 </style>
 
+<div class="picker" id="picker"><h1>だれが やる？</h1><div class="who"><button class="rei" data-who="rei"><span>🌸</span>REI</button><button class="ru" data-who="ru"><span>🐣</span>RU</button></div></div>
 <header>
   <div class="hrow">
-    <div class="logo">📖 よんで かいて 漢検</div>
+    <div class="logo">📖 よんで かいて 漢検</div> <button class="whochip" id="whochip" onclick="choosePicker()"></button>
     <div class="xp"><span id="xptext"></span><div class="xpbar"><div id="xpfill" style="width:0%"></div></div></div>
     <div id="streak" class="muted"></div>
   </div>
@@ -227,11 +237,24 @@ const KS = {}; Object.keys(KANJI).forEach(k => (KS[KANJI[k].g] = KS[KANJI[k].g]|
 Object.values(KS).forEach(a => a.sort((x,y) => (KANJI[x].f||9999)-(KANJI[y].f||9999)));
 
 /* ======================= 保存 ======================= */
-const KEY = 'kanji-reader-v2';
-let S = load();
+/* ======================= プロフィール（REI / RU） ======================= */
+const PROFILES = {rei:{name:'REI', emoji:'🌸'}, ru:{name:'RU', emoji:'🐣'}};
+let PROFILE = null;
+const BASE_KEY = 'kanji-reader-v2';
+function storeKey(){ return PROFILE ? BASE_KEY+':'+PROFILE : BASE_KEY; }
+function choosePicker(){ document.getElementById('picker').classList.add('on'); }
+function selectProfile(id){
+  PROFILE = id; S = load();
+  // 以前の（名前なしの）記録があれば、最初に選んだ子に引き継ぐ
+  try{ const legacy = localStorage.getItem(BASE_KEY); if(legacy && !localStorage.getItem(storeKey())){ localStorage.setItem(storeKey(), legacy); localStorage.removeItem(BASE_KEY); S = load(); } }catch(e){}
+  document.getElementById('picker').classList.remove('on');
+  touchStreak(); render();
+}
+document.querySelectorAll('#picker [data-who]').forEach(b => b.onclick = () => selectProfile(b.dataset.who));
+let S = defaults();
 function defaults(){ return {level:'10', xp:0, srs:{}, newPerDay:15, kakiMode:'hand', inputMode:'kana', sentFur:'all', furigana:'cur', fontSize:22, custom:[], lastDay:'', streak:0, introduced:{}, log:[], tests:[], daily:{}, dailyAll:{}, dailyGoal:20}; }
-function load(){ try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s) return Object.assign(defaults(), s); }catch(e){} return defaults(); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ const s = JSON.parse(localStorage.getItem(storeKey())); if(s) return Object.assign(defaults(), s); }catch(e){} return defaults(); }
+function save(){ try{ localStorage.setItem(storeKey(), JSON.stringify(S)); }catch(e){} }
 function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function addDays(ds, n){ const d = new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function touchStreak(){ const t=today(); if(S.lastDay===t) return; S.streak = (S.lastDay===addDays(t,-1)) ? S.streak+1 : 1; S.lastDay=t; save(); }
@@ -468,6 +491,7 @@ function levelStats(g){
 function kanjiState(k, g){ const its = itemsFor(g).filter(i => i.k===k); if(!its.length) return 0; const st = its.map(i => S.srs[i.id]); if(!st.some(Boolean)) return 0; if(its.some(i => isWeak(i.id))) return -1; if(st.every(Boolean) && its.every(i => isMastered(i.id))) return 2; return 1; }
 function allDue(){ let n=0; LEVELS.filter(l=>!l.locked).forEach(l => n += itemsFor(l.grade).filter(i => isDue(i.id)).length); return n; }
 function renderHeader(){
+  const wc = document.getElementById('whochip'); if(wc && PROFILE) wc.textContent = PROFILES[PROFILE].emoji+' '+PROFILES[PROFILE].name+' ▾';
   const rank = Math.floor(Math.sqrt(S.xp/10)); const next=(rank+1)**2*10, prev=rank**2*10;
   $('#xptext').textContent = `ランク ${rank}　${S.xp} XP`; $('#xpfill').style.width = Math.round((S.xp-prev)/(next-prev)*100)+'%';
   $('#streak').textContent = S.streak>0 ? `🔥 ${S.streak}日れんぞく` : '';
@@ -775,7 +799,5 @@ function bind(){
   const ca=$('#cadd'); if(ca) ca.onclick=()=>{ const title=$('#ctitle').value.trim(), text=$('#ctext').value.trim(); if(!title||!text){ toast('題名と本文を入れてください'); return; } S.custom.push({id:'c'+Date.now(), title, level:$('#clevel').value, emoji:'📘', kind:'追加', text, questions:[]}); save(); render(); toast('追加しました'); };
   m.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{ S.custom=S.custom.filter(c=>c.id!==b.dataset.cdel); save(); render(); });
 }
-/* v1 からの引き継ぎ（あれば XP だけ） */
-try{ const old = JSON.parse(localStorage.getItem('kanji-reader-v1')); if(old && !S.migrated){ S.xp += old.xp||0; S.custom = (old.custom||[]).concat(S.custom||[]); S.migrated=true; save(); } }catch(e){}
-touchStreak(); render();
+choosePicker();
 </script>
