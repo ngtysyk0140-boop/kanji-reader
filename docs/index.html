@@ -190,7 +190,7 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 
 .mascot{display:flex;gap:10px;align-items:flex-end;margin:4px 0 10px}
-.mascot .mimg{width:92px;height:92px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 2px 2px rgba(0,0,0,.08));transform-origin:50% 90%}
+.mascot .mimg{width:92px;height:92px;object-fit:cover;flex:0 0 auto;background:#fff;border-radius:28%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.08));transform-origin:50% 90%}
 .mascot .memoji{width:92px;height:92px;font-size:66px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;transform-origin:50% 90%}
 .mascot .bubble{position:relative;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:10px 14px;font-family:var(--font-kana, var(--font-text));font-weight:800;font-size:17px;line-height:1.5;flex:1;min-width:0;animation:pop .35s ease-out}
 .mascot .bubble::before{content:"";position:absolute;left:-10px;bottom:18px;border:8px solid transparent;border-right-color:var(--line);border-left:0}
@@ -226,7 +226,7 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 .sndbtn{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:5px 10px;font-size:15px}
 </style>
 
-<div class="cover" id="cover" onclick="sndUnlock(); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.png" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
+<div class="cover" id="cover" onclick="sndUnlock(); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.jpg" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
 <div class="picker" id="picker"><h1>だれが やる？</h1><div class="who"><button class="ra" data-who="ra"><span>⭐</span>RA</button><button class="rei" data-who="rei"><span>🌸</span>REI</button><button class="ru" data-who="ru"><span>🐣</span>RU</button></div></div>
 <header>
   <div class="hrow">

@@ -14,6 +14,7 @@ cw, ch = W//4, H//3
 for i, name in enumerate(ORDER):
     r, c = divmod(i, 4); dst = os.path.join(out, name+'.png')
     subprocess.run(['cp', src, dst], check=True)
-    subprocess.run(['sips','-c',str(ch),str(cw),'--cropOffset',str(r*ch),str(c*cw),dst,'--out',dst], capture_output=True)
+    # 下の段のキャラの頭が入り込まないよう、マスの下 12% を切り落とす
+    subprocess.run(['sips','-c',str(int(ch*0.88)),str(cw),'--cropOffset',str(r*ch),str(c*cw),dst,'--out',dst], capture_output=True)
     subprocess.run(['sips','-Z','400',dst,'--out',dst], capture_output=True)
 print('sliced 12 images ->', out)
