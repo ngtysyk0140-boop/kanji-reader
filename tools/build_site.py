@@ -31,5 +31,9 @@ json.dump({
   "background_color": "#fbf7ef", "theme_color": "#fbf7ef", "lang": "ja",
   "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}]
 }, open(os.path.join(DOCS, 'manifest.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+ASSETS = os.path.join(ROOT, 'assets')
+if os.path.isdir(ASSETS):
+    for fn in os.listdir(ASSETS):
+        if not fn.startswith('.') and fn != 'README.txt': shutil.copy(os.path.join(ASSETS, fn), os.path.join(DOCS, fn))
 open(os.path.join(DOCS, '.nojekyll'), 'w').close()
 print('built docs/', len(html))
