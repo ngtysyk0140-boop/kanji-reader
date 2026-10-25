@@ -293,6 +293,7 @@ function itemsFor(g){
   return cache[g] = items;
 }
 function TYPES_MIN_FIRST(){ return false; }
+function spreadItems(arr, dist=2){ const out=[], rest=arr.slice(); while(rest.length){ let idx = rest.findIndex(it => !out.slice(-dist).some(o => o.k===it.k || o.key===it.key)); if(idx<0) idx=0; out.push(rest.splice(idx,1)[0]); } return out; }
 /* 新しい問題の順番: 漢字ごとに「読み2語・書き2語・筆順・画数・部首・送り仮名・音訓・同音」をひとまとまりにして、使用頻度の高い漢字から。
    残りの語は、全漢字を一巡したあとの第2周で出す。対義語などの語彙問題は 8問に1問の割合で差しこむ。 */
 const orderCache = {};
@@ -300,14 +301,18 @@ function newOrder(g){
   if(orderCache[g]) return orderCache[g];
   const items = itemsFor(g); const byK = {}; const vocab = [];
   items.forEach(i => { if(['taigi','ruigi','kosei','yoji'].includes(i.type)) vocab.push(i); else (byK[i.k] = byK[i.k]||[]).push(i); });
-  const pass1 = [], pass2 = [];
+  const bundles = [], pass2 = [];
   (KS[g]||[]).forEach(k => { const its = byK[k]||[]; const words = [...new Set(its.filter(i=>i.type==='yomi').map(i=>i.key))];
-    const first = words.slice(0,2), rest = words.slice(2);
-    first.forEach(w => its.filter(i=>(i.type==='yomi'||i.type==='kaki') && i.key===w).forEach(i=>pass1.push(i)));
-    ['hitsu','kaku','bushu','okuri','onkun','doon'].forEach(t => its.filter(i=>i.type===t).forEach(i=>pass1.push(i)));
+    const first = words.slice(0,2), rest = words.slice(2); const b = [];
+    first.forEach(w => its.filter(i=>(i.type==='yomi'||i.type==='kaki') && i.key===w).forEach(i=>b.push(i)));
+    ['hitsu','kaku','bushu','okuri','onkun','doon'].forEach(t => its.filter(i=>i.type===t).forEach(i=>b.push(i)));
+    if(b.length) bundles.push(b);
     rest.forEach(w => its.filter(i=>(i.type==='yomi'||i.type==='kaki') && i.key===w).forEach(i=>pass2.push(i)));
   });
-  const out = []; let vi = 0; const seq = pass1.concat(pass2);
+  // 3つの漢字のまとまりを交互に出す（同じ字・同じ語が続かないように）
+  const pass1 = [];
+  for(let i=0;i<bundles.length;i+=3){ const grp = bundles.slice(i,i+3).map(b=>b.slice()); let any=true; while(any){ any=false; grp.forEach(b => { if(b.length){ pass1.push(b.shift()); any=true; } }); } }
+  const out = []; let vi = 0; const seq = pass1.concat(spreadItems(pass2));
   seq.forEach((i, n) => { out.push(i); if(n % 8 === 7 && vi < vocab.length) out.push(vocab[vi++]); });
   while(vi < vocab.length) out.push(vocab[vi++]);
   return orderCache[g] = out;
@@ -606,12 +611,15 @@ function buildSession(mode, type){
   }
   if(!pool.length && mode==='today'){ pool = newOrder(g).filter(i => !S.srs[i.id]).slice(0, 10); }  // きょうの分が終わっていても、ゴールまで追加で出す
   if(!pool.length){ toast(mode==='weak'?'にがてな もんだいは ありません':'この きゅうの もんだいは ぜんぶ やりました'); return null; }
-  SES = {mode, type, queue: pool.map(i => ({item:i, need:1, wrong:0})), i:0, done:0, total:pool.length, correct:0, startedNew: pool.filter(i=>!S.srs[i.id]).length, results:[]};
+  pool = spreadItems(pool);
+  SES = {mode, type, queue: pool.map(i => ({item:i, need:1, wrong:0})), i:0, done:0, total:pool.length, correct:0, startedNew: pool.filter(i=>!S.srs[i.id]).length, results:[], lastId:null};
   return SES;
 }
 function startSession(mode, type){ if(!buildSession(mode, type)) return; nextQ(); }
 function nextQ(){
   if(!SES.queue.length){ return endSession(); }
+  if(SES.queue.length > 1 && SES.queue[0].item.id === SES.lastId){ const x = SES.queue.shift(); SES.queue.splice(Math.min(2, SES.queue.length), 0, x); }
+  else if(SES.queue.length > 1 && SES.lastK && SES.queue[0].item.k === SES.lastK){ const j = SES.queue.findIndex(q => q.item.k !== SES.lastK); if(j > 0){ const x = SES.queue.splice(j,1)[0]; SES.queue.unshift(x); } }
   const cur = SES.queue[0]; const g = level().grade; const q = buildQ(cur.item, g); if(!q){ SES.queue.shift(); return nextQ(); }
   SES.q = q; SES.cur = cur; showQ(q, SES.done+1, SES.total, 'れんしゅう');
 }
@@ -714,9 +722,16 @@ function proceed(){
   const q = CUR; if(!q || q.proceeded) return; q.proceeded = true; const ok = q.ok; clearInterval(animTimer);
   if(TEST){ TEST.results.push({item:q.item, ok}); answer(q.item.id, ok); TEST.i++; return nextTestQ(); }
   if(!SES){ closeModal(); return; }
-  const cur = SES.queue.shift(); SES.results.push({item:q.item, ok, explain:q.explain});
-  if(ok){ SES.correct++; cur.need--; if(cur.need<=0){ SES.done++; if(!cur.wrong) answer(q.item.id, true); } else { SES.queue.splice(Math.min(3, SES.queue.length), 0, cur); } }
-  else { cur.wrong++; cur.need = 2; answer(q.item.id, false); SES.queue.splice(Math.min(3, SES.queue.length), 0, cur); }
+  const cur = SES.queue.shift(); SES.results.push({item:q.item, ok, explain:q.explain}); SES.lastId = q.item.id; SES.lastK = q.item.k;
+  const back = Math.min(SES.queue.length, 5 + Math.floor(Math.random()*3));
+  const requeue = () => { SES.queue.splice(back, 0, cur);
+    // 残りが少ないと同じ問題がすぐ戻ってくるので、新しい問題を補充して間隔をあける
+    SES.padded = SES.padded||0;
+    if(SES.queue.length < 4 && SES.mode !== 'weak' && SES.padded < 6){ SES.padded += 2; const inSes = new Set(SES.queue.map(x=>x.item.id).concat(SES.results.map(r=>r.item.id)));
+      const extra = newOrder(level().grade).filter(i => !S.srs[i.id] && !inSes.has(i.id) && i.k !== q.item.k).slice(0, 2);
+      extra.forEach(i => { SES.queue.splice(Math.max(0, SES.queue.length-1), 0, {item:i, need:1, wrong:0}); SES.total++; SES.startedNew++; }); } };
+  if(ok){ SES.correct++; cur.need--; if(cur.need<=0 || (SES.queue.length===0 && (SES.padded||0) >= 6)){ SES.done++; if(!cur.wrong) answer(q.item.id, true); } else requeue(); }
+  else { cur.wrong++; cur.need = 2; answer(q.item.id, false); requeue(); }
   nextQ();
 }
 /* 手書き */
