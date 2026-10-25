@@ -186,6 +186,9 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 .cover .ph{position:absolute;inset:0;background:linear-gradient(160deg,#ffe3c2 0%,#fbf7ef 55%,#dff1ea 100%)}
 .cover .cv-title{position:relative;z-index:1;text-align:center;padding:14px 26px;border-radius:24px;background:rgba(255,255,255,.82);color:#3a332f;font-family:var(--font-kana, var(--font-text));font-weight:800;font-size:clamp(26px,6vw,44px);letter-spacing:.06em;box-shadow:0 6px 24px rgba(0,0,0,.12);margin-top:auto}
 .cover .cv-title small{display:block;font-size:14px;font-weight:600;color:#7a6f68;letter-spacing:.1em;margin-top:4px}
+.cover .cover-mascot{position:relative;z-index:1;display:flex;align-items:flex-end;gap:10px;margin:0 20px 8px;min-height:0}
+.cover .cover-mascot .mimg,.cover .cover-mascot .memoji{width:110px;height:110px;font-size:80px;background:#fff;border-radius:28%;object-fit:cover;filter:drop-shadow(0 3px 4px rgba(0,0,0,.15));transform-origin:50% 90%;animation:popin .5s cubic-bezier(.2,1.6,.4,1) 1, float 2.4s ease-in-out .5s infinite}
+.cover .cover-mascot .bubble{background:rgba(255,255,255,.92);border:2px solid rgba(0,0,0,.06);border-radius:18px;padding:10px 14px;font-family:var(--font-kana, var(--font-text));font-weight:800;font-size:17px;color:#3a332f;animation:pop .35s ease-out}
 .cover .tap{position:relative;z-index:1;margin:18px 0 calc(40px + env(safe-area-inset-bottom,0px));background:#d9692a;color:#fff;font-weight:800;font-size:20px;padding:14px 32px;border-radius:30px;animation:pulse 1.6s ease-in-out infinite;box-shadow:0 6px 0 rgba(0,0,0,.1)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 
@@ -226,7 +229,7 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 .sndbtn{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:5px 10px;font-size:15px}
 </style>
 
-<div class="cover" id="cover" onclick="sndUnlock(); bgm('title'); sfx('tap'); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.jpg" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
+<div class="cover" id="cover" onclick="coverTap()"><div class="ph"></div><img src="cover.jpg" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="cover-mascot" id="coverMascot"></div><div class="tap" id="coverTapBtn">タップして はじめる</div></div>
 <div class="picker" id="picker"><h1>だれが やる？</h1><div class="who"><button class="ra" data-who="ra"><span>⭐</span>RA</button><button class="rei" data-who="rei"><span>🌸</span>REI</button><button class="ru" data-who="ru"><span>🐣</span>RU</button></div></div>
 <header>
   <div class="hrow">
@@ -372,6 +375,13 @@ const PROFILES = {ra:{name:'RA', emoji:'⭐'}, rei:{name:'REI', emoji:'🌸'}, r
 let PROFILE = null;
 const BASE_KEY = 'kanji-reader-v2';
 function storeKey(){ return PROFILE ? BASE_KEY+':'+PROFILE : BASE_KEY; }
+let coverStage = 0;
+function coverTap(){
+  if(coverStage===0){ coverStage=1; sndUnlock(); bgm('title'); sfx('tap');
+    const m=document.getElementById('coverMascot'); if(m) m.innerHTML = `<img class="mimg mv-welcome" src="chara/welcome.png" alt="" onerror="this.outerHTML='<span class=&quot;memoji mv-welcome&quot;>🦉</span>'"><div class="bubble">こんにちは！ いっしょに あそぼう</div>`;
+    const b=document.getElementById('coverTapBtn'); if(b) b.textContent='▶ はじめる'; return; }
+  document.getElementById('cover').classList.remove('on'); choosePicker();
+}
 function choosePicker(){ document.getElementById('picker').classList.add('on'); }
 function selectProfile(id){
   PROFILE = id; S = load();
