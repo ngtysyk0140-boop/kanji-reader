@@ -83,6 +83,11 @@ rt.on{font-size:.5em;color:var(--sub);font-family:var(--font-ui);letter-spacing:
 .ans-in.ok{border-color:var(--ok)}.ans-in.ng{border-color:var(--ng)}
 .fb{margin-top:10px;padding:10px 12px;border-radius:12px;font-size:15px}
 .fb.ok{background:var(--tint-w)}.fb.ng{background:var(--tint-ng)}
+.insight{margin-top:8px;background:var(--bg);border-radius:12px;padding:10px 12px;font-size:15px;line-height:1.9}
+.insight .w{font-family:var(--font-text);font-size:22px}
+.insight .k{display:inline-block;font-family:var(--font-text);font-size:20px;margin-right:4px}
+.insight .row2{margin-top:4px}
+.insight .tag{margin-right:4px}
 .canvaswrap{position:relative;width:min(100%,340px);aspect-ratio:1;margin:8px auto;border:2px solid var(--line);border-radius:14px;background:var(--paper);touch-action:none;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .sheet,.sheet *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .sheet input,.sheet textarea{-webkit-user-select:text;user-select:text}
@@ -177,6 +182,8 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 <script src="data/words.js"></script>
 <script src="data/sentences.js"></script>
 <script src="data/curated.js"></script>
+<script src="data/gloss.js"></script>
+<script src="data/parts.js"></script>
 <script src="data/stories.js"></script>
 <script>
 /* ======================= 定義 ======================= */
@@ -260,10 +267,10 @@ function itemsFor(g){
     if(g >= 3 && KANJI[k].rad) items.push({id:'bushu|'+k, type:'bushu', key:k, k});
     if(g >= 3) lst.filter(w => okuriForms(w)).slice(0,1).forEach(w => items.push({id:'okuri|'+w.w, type:'okuri', key:w.w, k}));
     if(g >= 3) lst.filter(w => onkunOf(w)).slice(0,1).forEach(w => items.push({id:'onkun|'+w.w, type:'onkun', key:w.w, k}));
-    if(g >= 3) lst.filter(w => homophones(w, g).length >= 1 && SENTS[w.w]).slice(0,1).forEach(w => items.push({id:'doon|'+w.w, type:'doon', key:w.w, k}));
   });
   const gradeOfPair = (a,b) => Math.max(wordGrade(a), wordGrade(b));
   const inLevel = pg => (g===3 ? pg <= 3 : g===7 ? pg >= 7 : pg === g) || (TYPES_MIN_FIRST(g) && pg <= g);
+  if(g >= 3) DOON.forEach((set,si) => { const pg = Math.max(...set[1].map(x=>wordGrade(x[0]))); if(pg <= 7 && (g===3 ? pg<=3 : g===7 ? pg===7 : pg===g)) set[1].forEach((x,wi) => items.push({id:'doon|'+si+'|'+wi, type:'doon', key:si+'|'+wi, k:[...x[0]].find(isHan)})); });
   if(g >= 3) ANTONYMS.forEach((p,i) => { const pg = gradeOfPair(p[0],p[2]); if(pg <= 7 && (g===3 ? pg<=3 : g===7 ? pg===7 : pg===g)) items.push({id:'taigi|'+i, type:'taigi', key:i, k:[...p[0]].find(isHan)}); });
   if(g >= 5) SYNONYMS.forEach((p,i) => { const pg = gradeOfPair(p[0],p[2]); if(pg <= 7 && (g===5 ? pg<=5 : g===7 ? pg===7 : pg===g)) items.push({id:'ruigi|'+i, type:'ruigi', key:i, k:[...p[0]].find(isHan)}); });
   if(g >= 4) KOSEI.forEach((p,i) => { const pg = wordGrade(p[0]); if(pg <= 7 && (g===4 ? pg<=4 : g===7 ? pg===7 : pg===g)) items.push({id:'kosei|'+i, type:'kosei', key:i, k:[...p[0]].find(isHan)}); });
@@ -304,8 +311,8 @@ function okuriForms(w){
   forms.add(k+full.slice(Math.max(0,stem.length-1)));
   if(ok.length>2) forms.add(k+ok.slice(2));
   forms.add(k+full.slice(Math.max(0,stem.length-2)));
-  const arr = [...forms].filter(f => f!==k).slice(0,4);
-  if(arr.length < 3) return null;
+  const arr = [...forms].filter(f => f!==k && (f===k+ok || (!WORD[f] && !(window.OKURI_OK||[]).includes(f)))).slice(0,4);
+  if(arr.length < 3 || (window.OKURI_OK||[]).includes(k+ok)) return null;
   return {correct:k+ok, forms:arr, reading:w.r};
 }
 /* 音訓判定 */
@@ -344,7 +351,7 @@ function renderMarkup(mk, g, opt={}){
       const wg = wordGrade(k);
       if(inT) return '<ruby class="'+(opt.furTarget?'fur':'')+'">'+esc(k)+'<rt>'+esc(r)+'</rt></ruby>';
       if(wg > g) return esc(r);
-      const fur = S.sentFur==='none' ? false : (S.sentFur==='cur' ? wg >= g : true);
+      const fur = opt.allFur ? true : (S.sentFur==='none' ? false : (S.sentFur==='cur' ? wg >= g : true));
       return '<ruby class="kw'+(fur?' fur':'')+'" data-r="'+esc(r)+'">'+esc(k)+'<rt>'+esc(r)+'</rt></ruby>';
     });
   });
@@ -358,50 +365,75 @@ function buildQ(item, g){
   const t = item.type, key = item.key;
   if(t==='yomi'){ const w = WORD[key]; const s = sentenceFor(key, g);
     return {item, prompt:'{黄色|きいろ}の{漢字|かんじ}の{読|よ}みを ひらがなで {答|こた}えましょう。', html: s ? '<div class="sent">'+renderMarkup(s[0], g, {mode:'show'})+'</div>' : '<div class="big">'+esc(w.w)+'</div>',
-      answer: s ? s[1] : w.r, kind:'input', choices: () => yomiChoices(w, s ? s[1] : w.r, g), explain: w.w+'（'+(s?s[1]:w.r)+'）' }; }
+      answer: s ? s[1] : w.r, accept: [w.r].concat(w.alts||[], s?[s[1]]:[]), kind:'input', choices: () => yomiChoices(w, s ? s[1] : w.r, g), sent: s?s[0]:null, explain: '{'+w.w+'|'+(s?s[1]:w.r)+'}', insight: () => wordInsight(w, g) }; }
   if(t==='kaki'){ const w = WORD[key]; const s = sentenceFor(key, g);
     return {item, prompt:'＿＿のひらがなを {漢字|かんじ}で {書|か}きましょう。', html: s ? '<div class="sent">'+renderMarkup(s[0], g, {mode:'blank', blankText:s[1]})+'</div>' : '<div class="big" style="font-size:40px">'+esc(w.r)+'</div>',
-      answer: w.w, kind: S.kakiMode==='hand' ? 'hand' : 'choice', choices: () => kakiChoices(w, g), explain: w.w+'（'+w.r+'）' }; }
+      answer: w.w, kind: S.kakiMode==='hand' ? 'hand' : 'choice', choices: () => kakiChoices(w, g), sent: s?s[0]:null, explain: '{'+w.w+'|'+w.r+'}', insight: () => wordInsight(w, g) }; }
   if(t==='hitsu'){ const n = STROKES[key].length; const idx = 1 + Math.floor(Math.random()*n);
     const opts = new Set([idx]); let d=1; while(opts.size<Math.min(4,n)){ if(idx-d>=1) opts.add(idx-d); if(opts.size<4 && idx+d<=n) opts.add(idx+d); d++; }
-    return {item, prompt:'{赤|あか}い{画|かく}は {何画目|なんかくめ}に {書|か}きますか。', html:'<div class="kbox">'+kanjiSVG(key, {highlight:idx-1})+'</div>', answer:String(idx), kind:'choice', choices: () => shuffle([...opts]).map(x=>String(x)), explain: key+' は '+n+'画。赤い画は '+idx+'画目', unit:'かくめ'}; }
+    return {item, prompt:'{赤|あか}い{画|かく}は {何画目|なんかくめ}に {書|か}きますか。', html:'<div class="kbox">'+kanjiSVG(key, {highlight:idx-1})+'</div>', answer:String(idx), kind:'choice', choices: () => shuffle([...opts]).map(x=>String(x)), explain: key+' は {'+n+'画|'+n+'かく}。{赤|あか}い{画|かく}は {'+idx+'画目|'+idx+'かくめ}', insight: () => kanjiInsight(key, g, {strokes:true}), unit:'かくめ'}; }
   if(t==='kaku'){ const n = KANJI[key].s; const opts = new Set([n]); let d=1; while(opts.size<4){ if(n-d>=1) opts.add(n-d); if(opts.size<4) opts.add(n+d); d++; }
-    return {item, prompt:'この{漢字|かんじ}の {総画数|そうかくすう}は {何画|なんかく}ですか。', html:'<div class="big" style="font-size:96px">'+key+'</div>', answer:String(n), kind:'choice', choices: () => shuffle([...opts]).map(x=>String(x)), explain: key+' は '+n+'画', unit:'かく'}; }
+    return {item, prompt:'この{漢字|かんじ}の {総画数|そうかくすう}は {何画|なんかく}ですか。', html:'<div class="big" style="font-size:96px">'+key+'</div>', answer:String(n), kind:'choice', choices: () => shuffle([...opts]).map(x=>String(x)), explain: key+' は {'+n+'画|'+n+'かく}', insight: () => kanjiInsight(key, g, {strokes:true}), unit:'かく'}; }
   if(t==='bushu'){ const rn = KANJI[key].rad; const r = RADICALS[rn];
     const others = pick([...new Set((KS[g]||[]).concat(KS[Math.max(1,g-1)]||[]).map(k=>KANJI[k].rad).filter(x=>x && x!==rn))], 3);
-    return {item, prompt:'この{漢字|かんじ}の {部首|ぶしゅ}は どれですか。', html:'<div class="big" style="font-size:96px">'+key+'</div>', answer:r[0], kind:'choice', choices: () => shuffle([rn,...others]).map(n => RADICALS[n][0]+'\u0001'+RADICALS[n][1]), explain: key+' の部首は「'+r[0]+'」（'+r[1]+'）'}; }
+    return {item, prompt:'この{漢字|かんじ}の {部首|ぶしゅ}は どれですか。', html:'<div class="big" style="font-size:96px">'+key+'</div>', answer:r[0], kind:'choice', choices: () => shuffle([rn,...others]).map(n => RADICALS[n][0]+'\u0001'+RADICALS[n][1]), explain: key+' の{部首|ぶしゅ}は「'+r[0]+'」（'+r[1]+'）', insight: () => kanjiInsight(key, g, {radical:true})}; }
   if(t==='okuri'){ const w = WORD[key]; const f = okuriForms(w);
-    return {item, prompt:'{読|よ}みに{合|あ}う {正|ただ}しい {送|おく}り{仮名|がな}は どれですか。', html:'<div class="big" style="font-size:40px">'+esc(f.reading)+'</div>', answer:f.correct, kind:'choice', choices: () => shuffle(f.forms), explain: f.correct+'（'+f.reading+'）'}; }
+    return {item, prompt:'{読|よ}みに{合|あ}う {正|ただ}しい {送|おく}り{仮名|がな}は どれですか。', html:'<div class="big" style="font-size:40px">'+esc(f.reading)+'</div>', answer:f.correct, kind:'choice', choices: () => shuffle(f.forms), explain: '{'+f.correct+'|'+f.reading+'}　{送|おく}り{仮名|がな}は、{読|よ}みが {変|か}わる {部分|ぶぶん}から {書|か}く', insight: () => wordInsight(w, g)}; }
   if(t==='onkun'){ const w = WORD[key]; const a = onkunOf(w);
-    return {item, prompt:'この{熟語|じゅくご}の {読|よ}みは {音|おん}と{訓|くん}の どの{組|く}み{合|あ}わせですか。', html:'<div class="big">'+esc(w.w)+'</div><p class="muted" style="text-align:center">読み: '+esc(w.r)+'</p>', answer:a, kind:'choice', choices: () => ['音と音','音と訓','訓と音','訓と訓'], explain: w.w+'（'+w.r+'）は '+a}; }
-  if(t==='doon'){ const w = WORD[key]; const s = sentenceFor(key, g); const hs = homophones(w, g);
-    return {item, prompt:'＿＿に{入|はい}る {正|ただ}しい{漢字|かんじ}は どれですか。', html:'<div class="sent">'+renderMarkup(s[0], g, {mode:'blank', blankText:s[1]})+'</div>', answer:w.w, kind:'choice', choices: () => shuffle([...new Set([w.w, ...pick(hs,3).map(x=>x.w), ...kakiChoices(w,g)])].slice(0,4)), explain: w.w+'（'+w.r+'）'}; }
+    return {item, prompt:'この{熟語|じゅくご}の {読|よ}みは {音|おん}と{訓|くん}の どの{組|く}み{合|あ}わせですか。', html:'<div class="big">'+esc(w.w)+'</div><p class="muted" style="text-align:center">読み: '+esc(w.r)+'</p>', answer:a, kind:'choice', choices: () => ['音と音','音と訓','訓と音','訓と訓'], explain: '{'+w.w+'|'+w.r+'}は '+a, insight: () => wordInsight(w, g)}; }
+  if(t==='doon'){ const [si,wi] = key.split('|'); const set = DOON[si]; const rd = set[0]; const x = set[1][wi]; const sent = x[1].replace('＿＿', '<span class="blank">'+esc(rd)+'</span>');
+    const others = set[1].filter((y,i)=>i!=wi).map(y=>y[0]); const fill = WORDS.filter(y => y.g<=g && y.p>=2 && y.w.length===x[0].length && y.r!==rd && !(y.alts||[]).includes(rd) && !set[1].some(z=>z[0]===y.w)).slice(0,60);
+    return {item, prompt:'＿＿に{入|はい}る {正|ただ}しい{漢字|かんじ}は どれですか。', html:'<div class="sent">'+sent+'</div>', answer:x[0], kind:'choice', choices: () => shuffle([x[0], ...others, ...pick(fill.map(y=>y.w), 3)].slice(0,4)), explain: '{'+x[0]+'|'+rd+'}＝'+x[2]+'。', insight: () => '<div class="insight">'+set[1].map(y=>'<span class="k">'+esc(y[0])+'</span>'+esc(y[2])).join('　／　')+'</div>'}; }
   if(t==='taigi' || t==='ruigi'){ const list = t==='taigi'?ANTONYMS:SYNONYMS; const p = list[key]; const flip = Math.random()<0.5; const q = flip?p[2]:p[0], qr = flip?p[3]:p[1], a = flip?p[0]:p[2], ar = flip?p[1]:p[3];
-    const others = pick(list.filter((x,i)=>i!==key && wordGrade(x[0])<=g && wordGrade(x[2])<=g).map(x => Math.random()<0.5?x[0]:x[2]).filter(x=>x!==a), 3);
-    return {item, prompt:(t==='taigi'?'{反対|はんたい}の{意味|いみ}の{言葉|ことば}':'{似|に}た{意味|いみ}の{言葉|ことば}')+'は どれですか。', html:'<div class="big">'+esc(q)+'</div><p class="muted" style="text-align:center">'+esc(qr)+'</p>', answer:a, kind:'choice', choices: () => shuffle([a,...others]), explain: q+'（'+qr+'）'+(t==='taigi'?' ↔ ':' ≒ ')+a+'（'+ar+'）'}; }
+    const others = pick(list.filter((x,i)=>i!==key && wordGrade(x[0])<=g && wordGrade(x[2])<=g).map(x => Math.random()<0.5?x[0]:x[2]).filter(x=>x!==a && x!==q), 3);
+    return {item, prompt:(t==='taigi'?'{反対|はんたい}の{意味|いみ}の{言葉|ことば}':'{似|に}た{意味|いみ}の{言葉|ことば}')+'は どれですか。', html:'<div class="big">'+esc(q)+'</div><p class="muted" style="text-align:center">'+esc(qr)+'</p>', answer:a, kind:'choice', choices: () => shuffle([a,...others]), explain: '{'+q+'|'+qr+'}'+(t==='taigi'?' ↔ ':' ≒ ')+'{'+a+'|'+ar+'}', insight: () => '<div class="insight">'+rb('{'+q+'|'+qr+'}')+' と '+rb('{'+a+'|'+ar+'}')+' は '+rb(t==='taigi'?'{反対|はんたい}の{意味|いみ}':'{似|に}た{意味|いみ}')+'<div class="row2">'+[...new Set([...q+a].filter(isHan))].map(k=>'<span class="k">'+k+'</span>'+esc(glossOf(k))).join('　')+'</div></div>'}; }
   if(t==='kosei'){ const p = KOSEI[key]; const names = {A:'ア {反対|はんたい}や{対|つい}の{意味|いみ}の{字|じ}を{重|かさ}ねた',B:'イ {同|おな}じような{意味|いみ}の{字|じ}を{重|かさ}ねた',C:'ウ {上|うえ}の{字|じ}が{下|した}の{字|じ}を{修飾|しゅうしょく}している',D:'エ {下|した}の{字|じ}が{上|うえ}の{字|じ}の{目的語|もくてきご}・{補語|ほご}になっている',E:'オ {上|うえ}の{字|じ}が{下|した}の{字|じ}の{意味|いみ}を{打|う}ち{消|け}している'};
-    return {item, prompt:'この{熟語|じゅくご}の {組|く}み{立|た}ては どれですか。', html:'<div class="big">'+esc(p[0])+'</div><p class="muted" style="text-align:center">'+esc(p[1])+'</p>', answer:p[2], kind:'choice', one:true, choices: () => Object.keys(names).map(k=>k+'\u0001'+names[k]), label: c => plain(names[c]), explain: p[0]+' は「'+plain(names[p[2]])+'」'}; }
+    return {item, prompt:'この{熟語|じゅくご}の {組|く}み{立|た}ては どれですか。', html:'<div class="big">'+esc(p[0])+'</div><p class="muted" style="text-align:center">'+esc(p[1])+'</p>', answer:p[2], kind:'choice', one:true, choices: () => Object.keys(names).map(k=>k+'\u0001'+names[k]), label: c => plain(names[c]), explain: '{'+p[0]+'|'+p[1]+'}＝'+(p[3]||'')+'（'+names[p[2]]+'）', insight: () => '<div class="insight">'+rb('{'+p[0]+'|'+p[1]+'}')+' ＝ '+esc(p[3]||'')+'<div class="row2">'+[...p[0]].map(k=>'<span class="k">'+k+'</span>'+esc(glossOf(k))).join('　')+'</div></div>'}; }
   if(t==='yoji'){ const p = YOJI[key]; const cs=[...p[0]]; const bi = Math.floor(Math.random()*4); const ans = cs[bi]; const shown = cs.map((c,i)=>i===bi?'<span class="blank">　</span>':c).join('');
     const pool = [...new Set(YOJI.flatMap(y=>[...y[0]]).filter(c=>c!==ans && KANJI[c] && KANJI[c].g<=g))];
     const sim = sameKanjiReading(ans, g).filter(c=>pool.includes(c));
-    return {item, prompt:'{四字熟語|よじじゅくご}の {空|あ}いたところに{入|はい}る {漢字|かんじ}は どれですか。', html:'<div class="big">'+shown+'</div><p class="muted" style="text-align:center">'+esc(p[1])+'：'+esc(p[2])+'</p>', answer:ans, kind: S.kakiMode==='hand'?'hand':'choice', choices: () => shuffle([ans, ...pick(sim,2), ...pick(pool,3)].filter((x,i,a)=>a.indexOf(x)===i).slice(0,4)), explain: p[0]+'（'+p[1]+'）'+p[2]}; }
+    return {item, prompt:'{四字熟語|よじじゅくご}の {空|あ}いたところに{入|はい}る {漢字|かんじ}は どれですか。', html:'<div class="big">'+shown+'</div><p class="muted" style="text-align:center">'+esc(p[1])+'：'+esc(p[2])+'</p>', answer:ans, kind: S.kakiMode==='hand'?'hand':'choice', choices: () => shuffle([ans, ...pick(sim,2), ...pick(pool,3)].filter((x,i,a)=>a.indexOf(x)===i).slice(0,4)), explain: '{'+p[0]+'|'+p[1]+'}　'+p[2], insight: () => '<div class="insight"><div class="row2">'+[...p[0]].map(k=>'<span class="k">'+k+'</span>'+esc(glossOf(k))).join('　')+'</div></div>'}; }
 }
 function yomiChoices(w, ans, g){
   const ks = [...w.w].filter(isHan); const pool = new Set();
-  ks.forEach(k => WORDS.filter(x => x.w.includes(k) && x.r!==ans && x.g<=g && x.p>=1 && Math.abs(x.r.length-ans.length)<=2).forEach(x=>pool.add(x.r)));
+  const valid = new Set([ans, w.r].concat(w.alts||[]));
+  ks.forEach(k => WORDS.filter(x => x.w.includes(k) && !valid.has(x.r) && x.g<=g && x.p>=1 && Math.abs(x.r.length-ans.length)<=2).forEach(x=>pool.add(x.r)));
   // 同じ漢字の別の読みから作った「それらしい」誤答
-  if(ks.length===1){ const rs = readingsOf(ks[0]); const okuri = w.w.slice(1); rs.on.concat(rs.kun).forEach(r => { const c = r+okuri; if(c!==ans) pool.add(c); }); }
+  if(ks.length===1){ const rs = readingsOf(ks[0]); const okuri = w.w.slice(1); rs.on.concat(rs.kun).forEach(r => { const c = r+okuri; if(!valid.has(c)) pool.add(c); }); }
+  [...pool].forEach(r => { if(valid.has(r)) pool.delete(r); });
   let arr = pick([...pool],3);
-  while(arr.length<3){ const x = WORDS[Math.floor(Math.random()*WORDS.length)]; if(x.r!==ans && !arr.includes(x.r)) arr.push(x.r); }
+  while(arr.length<3){ const x = WORDS[Math.floor(Math.random()*WORDS.length)]; if(!valid.has(x.r) && !arr.includes(x.r)) arr.push(x.r); }
   return shuffle([ans,...arr]);
 }
 function kakiChoices(w, g){
-  const pool = new Set(homophones(w,g).map(x=>x.w));
+  const pool = new Set();
   const cs = [...w.w];
   cs.forEach((c,i) => { if(!isHan(c)) return; sameKanjiReading(c,g).slice(0,6).forEach(x => { const f = cs.slice(); f[i]=x; pool.add(f.join('')); }); });
   WORDS.filter(x => x.g===w.g && x.w.length===w.w.length && x.w!==w.w).slice(0,40).forEach(x=>pool.add(x.w));
   pool.delete(w.w);
-  return shuffle([w.w, ...pick([...pool],3)]);
+  // 同じ読みの実在語（会う/合う など）は答えが二つになり得るので除く
+  const cand = [...pool].filter(x => !(WORD[x] && (WORD[x].r===w.r || (WORD[x].alts||[]).includes(w.r) || (w.alts||[]).includes(WORD[x].r))));
+  return shuffle([w.w, ...pick(cand,3)]);
+}
+/* ======================= なるほどパネル（意味・部品・仲間） ======================= */
+function glossOf(k){ const e = KANJI[k]; if(!e) return ''; const gl = (window.GLOSS||{})[k]; if(gl) return gl; return e.kun.length ? e.kun.map(r=>r.replace('-','')).slice(0,3).join('・') : (e.on[0]||''); }
+function radName(ch){ const hit = Object.values(RADICALS).find(r => r[0]===ch); return hit ? hit[1].split('・')[0] : ''; }
+function phonMates(k, g){ const ph = (window.PARTS||{})[k]?.ph; if(!ph) return []; const on = KANJI[k].on; return Object.keys(PARTS).filter(x => x!==k && PARTS[x].ph===ph && KANJI[x].g<=Math.max(g, KANJI[k].g) && KANJI[x].on.some(r=>on.includes(r))).slice(0,6); }
+function kanjiInsight(k, g, opt={}){
+  const e = KANJI[k]; if(!e) return ''; const P = (window.PARTS||{})[k]||{p:[]};
+  let h = '<div class="insight"><span class="k">'+k+'</span><b>'+esc(glossOf(k))+'</b>';
+  h += '<div class="row2"><span class="tag">よみ</span>'+(e.on.length?'<ruby>音<rt class="on">おん</rt></ruby> '+esc(e.on.join('・'))+'　':'')+(e.kun.length?'<ruby>訓<rt class="on">くん</rt></ruby> '+esc(e.kun.join('・')):'')+'</div>';
+  if(P.p.length >= 2 || opt.strokes){ h += '<div class="row2"><span class="tag">ぶひん</span>'+k+' ＝ '+P.p.map(p=>'<span class="k">'+esc(p[0])+'</span>'+(radName(p[0])?'（'+radName(p[0])+'）':'')+(opt.strokes?'<small>'+p[2]+'かく</small>':'')).join(' ＋ ')+(opt.strokes&&P.p.length>=2?' ＝ '+e.s+'かく':'')+'</div>'; }
+  if(e.rad && (opt.radical || P.p.length>=2)){ const r = RADICALS[e.rad]; const mates = Object.keys(KANJI).filter(x=>x!==k && KANJI[x].rad===e.rad && KANJI[x].g<=g).sort((a,b)=>(KANJI[a].f||9999)-(KANJI[b].f||9999)).slice(0,6); h += '<div class="row2"><span class="tag">ぶしゅ</span>'+r[0]+'（'+r[1].split('・')[0]+'）'+(mates.length?'　おなじ ぶしゅ: '+mates.map(x=>'<span class="k">'+x+'</span>').join(''):'')+'</div>'; }
+  const pm = phonMates(k, g); if(pm.length){ h += '<div class="row2"><span class="tag">おなじ おと</span>「'+esc(P.ph)+'」が おとを あらわす： '+pm.map(x=>'<span class="k">'+x+'</span>').join('')+' も「'+esc(e.on[0]||'')+'」</div>'; }
+  const ws = WORDS.filter(w => w.w.includes(k) && w.g<=Math.max(g,e.g) && w.p>=2).sort((a,b)=>b.p-a.p).slice(0,4); if(ws.length) h += '<div class="row2"><span class="tag">ことば</span>'+ws.map(w=>'<ruby>'+esc(w.w)+'<rt class="on">'+esc(w.r)+'</rt></ruby>').join('　')+'</div>';
+  return h + '</div>';
+}
+function wordInsight(w, g){
+  const ks = [...new Set([...w.w].filter(isHan))];
+  const ok = onkunOf(w);
+  let h = '<div class="insight"><span class="w">'+rb('{'+w.w+'|'+w.r+'}')+'</span>'+(ok?'　<span class="tag">'+ok+'</span>':'')+'</div>';
+  return h + ks.map(k => kanjiInsight(k, g)).join('');
 }
 /* ======================= 書き順 SVG ======================= */
 function kanjiSVG(k, opt={}){
@@ -490,7 +522,7 @@ function viewHome(){
   ${weakAll ? '<div class="card weaklist"><h2>🔥 にがてな もんだい</h2>'+weakItems().slice(0,8).map(it=>`<div class="w"><span><span class="tag">${plain(TYPES[it.type].name)}</span> <span class="k">${esc(keyLabel(it))}</span></span><span class="muted">まちがい ${S.srs[it.id].l}かい</span></div>`).join('')+'</div>' : ''}
   <div class="card"><h2>この${rb('{級|きゅう}')}の ${rb('{出題分野|しゅつだいぶんや}')}</h2><div class="tiles">${Object.keys(TYPES).filter(t=>TYPES[t].min<=g).map(t=>{ const its=itemsFor(g).filter(i=>i.type===t); const mm=its.filter(i=>isMastered(i.id)).length; return `<button class="tile" data-drill="${t}"><b>${TYPES[t].icon} ${rb(TYPES[t].name)}</b><small>${mm}/${its.length} ${rb('{定着|ていちゃく}')}</small></button>`; }).join('')}</div></div>`;
 }
-function keyLabel(it){ const t=it.type; if(t==='taigi') return ANTONYMS[it.key][0]+'↔'+ANTONYMS[it.key][2]; if(t==='ruigi') return SYNONYMS[it.key][0]+'≒'+SYNONYMS[it.key][2]; if(t==='kosei') return KOSEI[it.key][0]; if(t==='yoji') return YOJI[it.key][0]; return it.key; }
+function keyLabel(it){ const t=it.type; if(t==='doon'){ const [si,wi]=it.key.split('|'); return DOON[si][1][wi][0]; } if(t==='taigi') return ANTONYMS[it.key][0]+'↔'+ANTONYMS[it.key][2]; if(t==='ruigi') return SYNONYMS[it.key][0]+'≒'+SYNONYMS[it.key][2]; if(t==='kosei') return KOSEI[it.key][0]; if(t==='yoji') return YOJI[it.key][0]; return it.key; }
 function weakItems(){ const out=[]; LEVELS.filter(l=>!l.locked).forEach(l => itemsFor(l.grade).forEach(i => { if(isWeak(i.id)) out.push(i); })); return out.sort((a,b)=>S.srs[b.id].l-S.srs[a.id].l); }
 function viewDrill(){
   const g = level().grade;
@@ -574,7 +606,7 @@ function endSession(){
   const todayN = S.dailyAll[today()]||0, goal = S.dailyGoal||20;
   openModal(`<h2>おつかれさま！</h2><div class="big">${c} / ${n}</div><p class="muted" style="text-align:center">せいかい ${n?Math.round(c/n*100):0}%　+${xp} XP${SES.startedNew?'　あたらしい もんだい '+SES.startedNew:''}</p>
    ${todayN>=goal?'<div class="done-banner">🎉 きょうの ゴール たっせい！（'+todayN+'もん）</div>':'<p style="text-align:center;font-weight:700">きょう '+todayN+' / '+goal+'もん　あと '+(goal-todayN)+'もん</p>'}
-   ${SES.results.filter(r=>!r.ok).length?'<h3>まちがえた問題（あとで また出ます）</h3><div class="weaklist">'+SES.results.filter(r=>!r.ok).map(r=>`<div class="w"><span><span class="tag">${plain(TYPES[r.item.type].name)}</span> <span class="k">${esc(keyLabel(r.item))}</span></span><span class="muted">${esc(r.explain)}</span></div>`).join('')+'</div>':''}
+   ${SES.results.filter(r=>!r.ok).length?'<h3>まちがえた問題（あとで また出ます）</h3><div class="weaklist">'+SES.results.filter(r=>!r.ok).map(r=>`<div class="w"><span><span class="tag">${plain(TYPES[r.item.type].name)}</span> <span class="k">${esc(keyLabel(r.item))}</span></span><span class="muted">${rb(r.explain)}</span></div>`).join('')+'</div>':''}
    <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">もどる</button></div>`);
   SES = null;
 }
@@ -627,7 +659,7 @@ function showQ(q, idx, total, title){
 }
 function switchChoice(){ const q = CUR; q.kind='choice'; showQ(q, '', '', TEST?'もぎテスト':'れんしゅう'); }
 function abort(){ clearInterval(animTimer); if(TEST){ TEST=null; } if(SES){ SES=null; } closeModal(); }
-function judgeInput(){ const el = $('#ansin') || $('#ansbox'); if(!el || el.dataset.done) return; const v = norm(el.id==='ansin' ? el.value : KB.text); if(!v) return; const ok = v===norm(CUR.answer); el.classList.add(ok?'ok':'ng'); el.dataset.done='1'; if(el.id==='ansin') el.disabled=true; finish(ok, ok?'':'こたえは「'+CUR.answer+'」'); }
+function judgeInput(){ const el = $('#ansin') || $('#ansbox'); if(!el || el.dataset.done) return; const v = norm(el.id==='ansin' ? el.value : KB.text); if(!v) return; const ok = v===norm(CUR.answer) || (CUR.accept||[]).some(a => norm(a)===v); el.classList.add(ok?'ok':'ng'); el.dataset.done='1'; if(el.id==='ansin') el.disabled=true; finish(ok, ok?'':'こたえは「'+CUR.answer+'」'); }
 /* 50音キーボード（IME を使わずひらがなだけ入力） */
 const KB = {text:''};
 const KANA_COLS = ['あいうえお','かきくけこ','さしすせそ','たちつてと','なにぬねの','はひふへほ','まみむめも','や　ゆ　よ','らりるれろ','わ　を　ん'];
@@ -656,9 +688,12 @@ function kbFn(f){ const b=$('#ansbox'); if(!b || b.dataset.done) return; const t
 function judgeChoice(btn){ const v = btn.dataset.v; const ok = v===CUR.answer; document.querySelectorAll('.choice').forEach(b => { b.disabled=true; if(b.dataset.v===CUR.answer) b.classList.add('ok'); }); if(!ok) btn.classList.add('ng'); finish(ok, ok?'':'こたえは「'+(CUR.label?CUR.label(CUR.answer):CUR.answer)+'」'); }
 function revealAns(){ $('#cw').classList.add('reveal'); $('#wbtns').innerHTML = `<span class="muted">みくらべて じぶんで はんてい</span><button class="btn" onclick="finish(true,'')">○ かけた</button><button class="btn ghost" onclick="finish(false,'もういちど かいて おぼえよう')">△ ちがった</button>`; }
 function finish(ok, msg){
-  const q = CUR; const fb = $('#fb'); if(fb) fb.innerHTML = `<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ せいかい！':'❌ '+esc(msg)}　<span class="muted">${esc(q.explain)}</span>${q.item.k&&STROKES[q.item.k]?` <button class="btn ghost sm" onclick="showKanjiCard('${q.item.k}')">かんじカード</button>`:''}</div><div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="nextbtn" onclick="proceed()">つぎへ →</button></div>`;
-  CUR.ok = ok; const nb=$('#nextbtn'); if(nb) nb.focus();
-  if(ok && q.kind!=='hand') setTimeout(()=>{ if(CUR===q && !CUR.proceeded) proceed(); }, 900);
+  const q = CUR; const g = level().grade;
+  if(q.sent){ const se = document.querySelector('.q .sent'); if(se) se.innerHTML = renderMarkup(q.sent, g, {mode:'show', furTarget:true, allFur:true}); }
+  const ins = q.insight ? q.insight() : '';
+  const fb = $('#fb'); if(fb) fb.innerHTML = `<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ せいかい！':'❌ '+esc(msg)}　<span>${rb(q.explain)}</span>${q.item.k&&STROKES[q.item.k]?` <button class="btn ghost sm" onclick="showKanjiCard('${q.item.k}')">かんじカード</button>`:''}</div>${ins}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="nextbtn" onclick="proceed()">つぎへ →</button></div>`;
+  CUR.ok = ok; const nb=$('#nextbtn'); if(nb) nb.scrollIntoView({block:'nearest'});
+  // 正解でも自動では進めない（解説を読めるように）
 }
 function proceed(){
   const q = CUR; if(!q || q.proceeded) return; q.proceeded = true; const ok = q.ok; clearInterval(animTimer);

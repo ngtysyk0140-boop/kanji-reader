@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET, re, json, os
-SRC = os.path.join(os.path.dirname(__file__), 'src')
-OUT = '/Users/nagatayoshiyuki/Desktop/kanji-reader/data'
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
 
 # 学年配当（v1 の DB: Wikipedia 学年別漢字配当表 2020年版）
 s = open(os.path.join(OUT, 'kanji_db.js'), encoding='utf-8').read()

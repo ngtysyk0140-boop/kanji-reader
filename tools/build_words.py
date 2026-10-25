@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET, re, json, os, sys
 from collections import defaultdict, Counter
-SRC = os.path.join(os.path.dirname(__file__), 'src')
-OUT = '/Users/nagatayoshiyuki/Desktop/kanji-reader/data'
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
 
 s = open(os.path.join(OUT, 'kanji.js'), encoding='utf-8').read()
 K = json.loads(re.search(r'window.KANJI = (\{.*?\});\n', s).group(1))
@@ -59,17 +59,24 @@ for ev, el in ctx:
         g = grade_of(keb)
         if g == 99 or g == 0: continue
         # reading
-        reb = None
+        reb = None; alts = []
         for re_ in rels:
             if re_.find('re_nokanji') is not None: continue
             restr = [r.text for r in re_.findall('re_restr')]
             if restr and keb not in restr: continue
-            reb = re_.find('reb').text; break
+            if re_.find('re_inf') is not None and reb: continue  # 古い読みなどは別読みにも含めない
+            if reb is None: reb = re_.find('reb').text
+            else: alts.append(re_.find('reb').text)
         if not reb: continue
         if blocked(keb): continue
         sc = pri_score(pri)
-        if keb in WORDS and WORDS[keb]['p'] >= sc: continue
-        WORDS[keb] = {'w': keb, 'r': reb, 'g': g, 'p': sc, 'pos': pos_code(poslist), 'uk': uk}
+        if keb in WORDS:
+            prev = WORDS[keb]
+            extra = [r for r in [reb]+alts if r != prev['r'] and r not in prev['alts']]
+            if prev['p'] >= sc:
+                prev['alts'] += extra; continue
+            alts = alts + [r for r in [prev['r']]+prev['alts'] if r != reb and r not in alts]
+        WORDS[keb] = {'w': keb, 'r': reb, 'g': g, 'p': sc, 'pos': pos_code(poslist), 'uk': uk, 'alts': alts}
     el.clear()
 print('entries', n, 'words', len(WORDS))
 
@@ -181,6 +188,7 @@ for w in sorted(chosen, key=lambda w: (WORDS[w]['g'], -WORDS[w]['p'], w)):
     d = WORDS[w]
     o = {'w': w, 'r': d['r'], 'g': d['g'], 'p': d['p'], 'pos': d['pos']}
     if d['uk']: o['uk'] = 1
+    if d['alts']: o['alts'] = d['alts']
     out_words.append(o)
 out_sents = {w: SENTS[w] for w in chosen if w in SENTS and (WORDS[w]['g'] <= 6 or WORDS[w]['p'] >= 2)}
 with open(os.path.join(OUT, 'words.js'), 'w', encoding='utf-8') as f:
