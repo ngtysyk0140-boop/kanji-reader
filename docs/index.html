@@ -222,13 +222,15 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 @keyframes popin{0%{transform:scale(.6)}100%{transform:scale(1)}}
 @keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion: reduce){.mascot *{animation:none!important}}
+
+.sndbtn{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:5px 10px;font-size:15px}
 </style>
 
-<div class="cover" id="cover" onclick="document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.png" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
+<div class="cover" id="cover" onclick="sndUnlock(); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.png" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
 <div class="picker" id="picker"><h1>だれが やる？</h1><div class="who"><button class="ra" data-who="ra"><span>⭐</span>RA</button><button class="rei" data-who="rei"><span>🌸</span>REI</button><button class="ru" data-who="ru"><span>🐣</span>RU</button></div></div>
 <header>
   <div class="hrow">
-    <div class="logo">📖 よんで かいて 漢検</div> <button class="whochip" id="whochip" onclick="choosePicker()"></button>
+    <div class="logo">📖 よんで かいて 漢検</div> <button class="whochip" id="whochip" onclick="choosePicker()"></button> <button class="sndbtn" id="sndbtn" onclick="cycleSound()">🎵</button>
     <div class="xp"><span id="xptext"></span><div class="xpbar"><div id="xpfill" style="width:0%"></div></div></div>
     <div id="streak" class="muted"></div>
   </div>
@@ -296,6 +298,47 @@ const KS = {}; Object.keys(KANJI).forEach(k => (KS[KANJI[k].g] = KS[KANJI[k].g]|
 Object.values(KS).forEach(a => a.sort((x,y) => (KANJI[x].f||9999)-(KANJI[y].f||9999)));
 
 /* ======================= 保存 ======================= */
+/* ======================= 音（BGM・効果音） ======================= */
+const SOUND_FILES = ['bgm_home','bgm_play','sfx_tap','sfx_correct','sfx_wrong','sfx_cheer','sfx_badge','sfx_end','sfx_goal','sfx_stroke_ok','sfx_stroke_ng'];
+const SND = {ctx:null, have:{}, buf:{}, bgmEl:null, cur:null, unlocked:false};
+async function sndProbe(){ await Promise.all(SOUND_FILES.map(async n => { try{ const r = await fetch('sound/'+n+'.mp3', {method:'HEAD'}); SND.have[n] = r.ok; }catch(e){ SND.have[n]=false; } })); }
+function sndUnlock(){ if(SND.unlocked) return; SND.unlocked=true; try{ SND.ctx = new (window.AudioContext||window.webkitAudioContext)(); SND.ctx.resume(); }catch(e){}
+  if(!SND.bgmEl){ SND.bgmEl = new Audio(); SND.bgmEl.loop = true; SND.bgmEl.volume = 0; }
+  // 無音を一度再生して iOS の再生許可を得る
+  try{ SND.bgmEl.src = 'data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA'; SND.bgmEl.play().catch(()=>{}); }catch(e){}
+}
+function soundMode(){ return S.sound || 'all'; }  // all / sfx / off
+async function sfxBuffer(n){ if(SND.buf[n]) return SND.buf[n]; if(!SND.have[n] || !SND.ctx) return null; try{ const ab = await (await fetch('sound/'+n+'.mp3')).arrayBuffer(); SND.buf[n] = await SND.ctx.decodeAudioData(ab); return SND.buf[n]; }catch(e){ return null; } }
+async function sfx(name){
+  if(soundMode()==='off' || !SND.ctx) return; const n = 'sfx_'+name;
+  const b = await sfxBuffer(n);
+  if(b){ const s = SND.ctx.createBufferSource(); s.buffer=b; const g=SND.ctx.createGain(); g.gain.value=0.9; s.connect(g).connect(SND.ctx.destination); s.start(); return; }
+  synth(name);
+}
+/* ファイルが無いときの合成音 */
+function tone(f, t0, dur, type='sine', vol=0.18){ const c=SND.ctx; const o=c.createOscillator(), g=c.createGain(); o.type=type; o.frequency.value=f; g.gain.setValueAtTime(0.0001,c.currentTime+t0); g.gain.exponentialRampToValueAtTime(vol,c.currentTime+t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+t0+dur); o.connect(g).connect(c.destination); o.start(c.currentTime+t0); o.stop(c.currentTime+t0+dur+0.05); }
+function synth(name){ if(!SND.ctx) return; switch(name){
+  case 'tap': tone(880,0,0.06,'triangle',0.08); break;
+  case 'correct': tone(784,0,0.12,'sine'); tone(1175,0.12,0.22,'sine'); break;
+  case 'wrong': tone(220,0,0.18,'square',0.06); tone(185,0.2,0.28,'square',0.06); break;
+  case 'cheer': [523,659,784,1047].forEach((f,i)=>tone(f,i*0.09,0.25,'triangle',0.14)); tone(1319,0.4,0.5,'triangle',0.14); break;
+  case 'badge': [1047,1319,1568,2093].forEach((f,i)=>tone(f,i*0.07,0.3,'sine',0.12)); break;
+  case 'end': tone(659,0,0.2,'sine'); tone(523,0.22,0.2,'sine'); tone(392,0.44,0.5,'sine'); break;
+  case 'goal': [392,523,659,784,1047].forEach((f,i)=>tone(f,i*0.1,0.3,'triangle',0.14)); tone(1047,0.6,0.7,'triangle',0.16); break;
+  case 'stroke_ok': tone(1319,0,0.08,'sine',0.1); break;
+  case 'stroke_ng': tone(260,0,0.12,'triangle',0.08); break;
+} }
+function bgm(track){ // 'home' | 'play' | null
+  if(!SND.bgmEl) return; const n = track ? 'bgm_'+track : null;
+  if(soundMode()!=='all' || !n || !SND.have[n]){ SND.cur=null; fadeTo(0, true); return; }
+  if(SND.cur===n){ fadeTo(0.35); return; }
+  SND.cur = n; SND.bgmEl.src = 'sound/'+n+'.mp3'; SND.bgmEl.volume = 0; SND.bgmEl.play().catch(()=>{}); fadeTo(0.35);
+}
+let fadeTimer=null;
+function fadeTo(v, pauseAtZero){ clearInterval(fadeTimer); const el=SND.bgmEl; if(!el) return; fadeTimer=setInterval(()=>{ const d=v-el.volume; if(Math.abs(d)<0.03){ el.volume=v; clearInterval(fadeTimer); if(v===0 && pauseAtZero){ el.pause(); } return; } el.volume = Math.max(0, Math.min(1, el.volume + Math.sign(d)*0.03)); }, 60); }
+function cycleSound(){ const m = soundMode(); S.sound = m==='all'?'sfx':m==='sfx'?'off':'all'; save(); renderHeader(); if(S.sound==='all') bgm(SES||TEST||(typeof TR!=='undefined'&&TR)?'play':'home'); else bgm(null); if(S.sound!=='off') sfx('tap'); }
+function soundIcon(){ const m=soundMode(); return m==='all'?'🎵':m==='sfx'?'🔔':'🔇'; }
+sndProbe();
 /* ======================= マスコット（キャラクター） ======================= */
 const MASCOT = {emoji:'🦉', name:'ふくせんせい'};
 const LINES = {
@@ -326,7 +369,7 @@ function selectProfile(id){
   // 以前の（名前なしの）記録があれば、最初に選んだ子に引き継ぐ
   try{ const legacy = localStorage.getItem(BASE_KEY); if(legacy && !localStorage.getItem(storeKey())){ localStorage.setItem(storeKey(), legacy); localStorage.removeItem(BASE_KEY); S = load(); } }catch(e){}
   document.getElementById('picker').classList.remove('on');
-  touchStreak(); render();
+  touchStreak(); render(); sfx('tap'); bgm('home');
 }
 document.querySelectorAll('#picker [data-who]').forEach(b => b.onclick = () => selectProfile(b.dataset.who));
 let S = defaults();
@@ -569,6 +612,7 @@ function levelStats(g){
 function kanjiState(k, g){ const its = itemsFor(g).filter(i => i.k===k); if(!its.length) return 0; const st = its.map(i => S.srs[i.id]); if(!st.some(Boolean)) return 0; if(its.some(i => isWeak(i.id))) return -1; if(st.every(Boolean) && its.every(i => isMastered(i.id))) return 2; return 1; }
 function allDue(){ let n=0; LEVELS.filter(l=>!l.locked).forEach(l => n += itemsFor(l.grade).filter(i => isDue(i.id)).length); return n; }
 function renderHeader(){
+  const sb = document.getElementById('sndbtn'); if(sb) sb.textContent = soundIcon();
   const wc = document.getElementById('whochip'); if(wc && PROFILE) wc.textContent = PROFILES[PROFILE].emoji+' '+PROFILES[PROFILE].name+' ▾';
   const rank = Math.floor(Math.sqrt(S.xp/10)); const next=(rank+1)**2*10, prev=rank**2*10;
   $('#xptext').textContent = `ランク ${rank}　${S.xp} XP`; $('#xpfill').style.width = Math.round((S.xp-prev)/(next-prev)*100)+'%';
@@ -703,7 +747,7 @@ function buildSession(mode, type){
   SES = {mode, type, queue: pool.map(i => ({item:i, need:1, wrong:0})), i:0, done:0, total:pool.length, correct:0, startedNew: pool.filter(i=>!S.srs[i.id]).length, results:[], lastId:null};
   return SES;
 }
-function startSession(mode, type){ if(!buildSession(mode, type)) return; nextQ(); }
+function startSession(mode, type){ if(!buildSession(mode, type)) return; bgm('play'); nextQ(); }
 function nextQ(){
   if(!SES.queue.length){ return endSession(); }
   if(SES.queue.length > 1 && SES.queue[0].item.id === SES.lastId){ const x = SES.queue.shift(); SES.queue.splice(Math.min(2, SES.queue.length), 0, x); }
@@ -712,7 +756,8 @@ function nextQ(){
   SES.q = q; SES.cur = cur; showQ(q, SES.done+1, SES.total, 'れんしゅう');
 }
 function endSession(){
-  const n = SES.results.length, c = SES.correct; const xp = c*4 + SES.startedNew*2; addXP(xp); touchStreak(); render();
+  const n = SES.results.length, c = SES.correct; const xp = c*4 + SES.startedNew*2; addXP(xp); touchStreak(); render(); bgm('home');
+  { const tn=(S.dailyAll[today()]||0); sfx(tn>=(S.dailyGoal||20) ? 'goal' : 'end'); }
   const t = today(); S.introduced[t] = (S.introduced[t]||0) + SES.startedNew; S.log.push({date:t, n, c, mode:SES.mode}); S.log = S.log.slice(-200); save();
   const todayN = S.dailyAll[today()]||0, goal = S.dailyGoal||20;
   openModal(mascot(todayN>=goal?'cheer':'sleep') + `<h2>おつかれさま！</h2><div class="big">${c} / ${n}</div><p class="muted" style="text-align:center">せいかい ${n?Math.round(c/n*100):0}%　+${xp} XP${SES.startedNew?'　あたらしい もんだい '+SES.startedNew:''}</p>
@@ -727,7 +772,7 @@ function startTest(){
   const lv = level(), g = lv.grade; const plan = TEST_PLAN[g]||TEST_PLAN[7]; const items = itemsFor(g); const qs = [];
   Object.keys(plan).forEach(t => { const its = items.filter(i=>i.type===t); qs.push(...pick(its, plan[t])); });
   if(qs.length < 10){ toast('この級の問題が足りません'); return; }
-  TEST = {qs: shuffle(qs), i:0, results:[], start: Date.now()};
+  TEST = {qs: shuffle(qs), i:0, results:[], start: Date.now()}; bgm('play');
   nextTestQ();
 }
 function nextTestQ(){
@@ -740,7 +785,7 @@ function endTest(){
   const byType = {}; TEST.results.forEach(r => { const b = byType[r.item.type] = byType[r.item.type]||{n:0,c:0}; b.n++; if(r.ok) b.c++; });
   const weak = Object.keys(byType).filter(t => byType[t].c/byType[t].n < 0.6).map(t=>plain(TYPES[t].name)).join('・');
   const mins = Math.round((Date.now()-TEST.start)/60000);
-  S.tests.push({date:today(), level:lv.id, score, weak}); S.tests = S.tests.slice(-50); addXP(c*3); touchStreak(); save(); render();
+  S.tests.push({date:today(), level:lv.id, score, weak}); S.tests = S.tests.slice(-50); addXP(c*3); touchStreak(); save(); render(); bgm('home'); sfx(score>=lv.pass?'goal':'end');
   openModal(mascot(score>=lv.pass?'cheer':'think', score>=lv.pass?'ごうかくライン とっぱ！ すごい！':'あと すこし！ にがてを つぶそう') + `<h2>${lv.name} 模擬テスト 結果</h2><div class="big">${score}%</div><p style="text-align:center;font-size:18px;font-weight:700">${score>=lv.pass?'🎉 合格ラインを超えました':'合格ラインまで あと '+(lv.pass-score)+'%'}</p><p class="muted" style="text-align:center">${c} / ${n} 問正解・${mins}分</p>
    <table class="tb"><tr><th>分野</th><th>正解</th><th>正答率</th></tr>${Object.keys(byType).map(t=>`<tr><td>${rb(TYPES[t].name)}</td><td>${byType[t].c}/${byType[t].n}</td><td ${byType[t].c/byType[t].n<0.6?'style="color:var(--ng)"':''}>${Math.round(byType[t].c/byType[t].n*100)}%</td></tr>`).join('')}</table>
    <p class="muted">まちがえた問題は反復のキューに入りました。「きょうの学習」で出ます。</p>
@@ -769,7 +814,7 @@ function showQ(q, idx, total, title){
   $('#sheet').querySelectorAll('ruby.kw').forEach(r => r.onclick = () => r.classList.toggle('show'));
 }
 function switchChoice(){ const q = CUR; q.kind='choice'; showQ(q, '', '', TEST?'もぎテスト':'れんしゅう'); }
-function abort(){ clearInterval(animTimer); if(TEST){ TEST=null; } if(SES){ SES=null; } closeModal(); }
+function abort(){ clearInterval(animTimer); if(TEST){ TEST=null; } if(SES){ SES=null; } closeModal(); bgm('home'); }
 function judgeInput(){ const el = $('#ansin') || $('#ansbox'); if(!el || el.dataset.done) return; const v = norm(el.id==='ansin' ? el.value : KB.text); if(!v) return; const ok = v===norm(CUR.answer) || (CUR.accept||[]).some(a => norm(a)===v); el.classList.add(ok?'ok':'ng'); el.dataset.done='1'; if(el.id==='ansin') el.disabled=true; finish(ok, ok?'':'こたえは「'+CUR.answer+'」'); }
 /* 50音キーボード（IME を使わずひらがなだけ入力） */
 const KB = {text:''};
@@ -805,6 +850,7 @@ function finish(ok, msg){
   if(SES){ SES.streakOk = ok ? (SES.streakOk||0)+1 : 0; }
   const wasWrong = SES && SES.cur && SES.cur.wrong > 0;
   const mexpr = ok ? ((SES && SES.streakOk>=3 && SES.streakOk%3===0) ? 'cheer' : 'happy') : (wasWrong || isWeak(q.item.id) ? 'sad' : 'oops');
+  sfx(mexpr==='cheer'?'cheer':ok?'correct':'wrong');
   const fb = $('#fb'); if(fb) fb.innerHTML = mascot(mexpr, null, 'sm') + `<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ せいかい！':'❌ '+esc(msg)}　<span>${rb(q.explain)}</span>${q.item.k&&STROKES[q.item.k]?` <button class="btn ghost sm" onclick="showKanjiCard('${q.item.k}')">かんじカード</button>`:''}</div>${ins}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="nextbtn" onclick="proceed()">つぎへ →</button></div>`;
   CUR.ok = ok; const nb=$('#nextbtn'); if(nb) nb.scrollIntoView({block:'nearest'});
   // 正解でも自動では進めない（解説を読めるように）

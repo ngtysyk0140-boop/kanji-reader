@@ -39,5 +39,9 @@ CH = os.path.join(ROOT, 'assets', 'chara')
 if os.path.isdir(CH):
     if os.path.isdir(os.path.join(DOCS, 'chara')): shutil.rmtree(os.path.join(DOCS, 'chara'))
     shutil.copytree(CH, os.path.join(DOCS, 'chara'))
+SO = os.path.join(ROOT, 'assets', 'sound')
+if os.path.isdir(SO):
+    if os.path.isdir(os.path.join(DOCS, 'sound')): shutil.rmtree(os.path.join(DOCS, 'sound'))
+    shutil.copytree(SO, os.path.join(DOCS, 'sound'))
 open(os.path.join(DOCS, '.nojekyll'), 'w').close()
 print('built docs/', len(html))
