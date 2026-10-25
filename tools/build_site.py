@@ -34,6 +34,10 @@ json.dump({
 ASSETS = os.path.join(ROOT, 'assets')
 if os.path.isdir(ASSETS):
     for fn in os.listdir(ASSETS):
-        if not fn.startswith('.') and fn != 'README.txt': shutil.copy(os.path.join(ASSETS, fn), os.path.join(DOCS, fn))
+        if not fn.startswith('.') and fn != 'README.txt' and os.path.isfile(os.path.join(ASSETS, fn)): shutil.copy(os.path.join(ASSETS, fn), os.path.join(DOCS, fn))
+CH = os.path.join(ROOT, 'assets', 'chara')
+if os.path.isdir(CH):
+    if os.path.isdir(os.path.join(DOCS, 'chara')): shutil.rmtree(os.path.join(DOCS, 'chara'))
+    shutil.copytree(CH, os.path.join(DOCS, 'chara'))
 open(os.path.join(DOCS, '.nojekyll'), 'w').close()
 print('built docs/', len(html))

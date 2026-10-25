@@ -188,6 +188,40 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 .cover .cv-title small{display:block;font-size:14px;font-weight:600;color:#7a6f68;letter-spacing:.1em;margin-top:4px}
 .cover .tap{position:relative;z-index:1;margin:18px 0 calc(40px + env(safe-area-inset-bottom,0px));background:#d9692a;color:#fff;font-weight:800;font-size:20px;padding:14px 32px;border-radius:30px;animation:pulse 1.6s ease-in-out infinite;box-shadow:0 6px 0 rgba(0,0,0,.1)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+.mascot{display:flex;gap:10px;align-items:flex-end;margin:4px 0 10px}
+.mascot .mimg{width:92px;height:92px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 2px 2px rgba(0,0,0,.08));transform-origin:50% 90%}
+.mascot .memoji{width:92px;height:92px;font-size:66px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;transform-origin:50% 90%}
+.mascot .bubble{position:relative;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:10px 14px;font-family:var(--font-kana, var(--font-text));font-weight:800;font-size:17px;line-height:1.5;flex:1;min-width:0;animation:pop .35s ease-out}
+.mascot .bubble::before{content:"";position:absolute;left:-10px;bottom:18px;border:8px solid transparent;border-right-color:var(--line);border-left:0}
+.mascot .bubble::after{content:"";position:absolute;left:-7px;bottom:19px;border:7px solid transparent;border-right-color:var(--card);border-left:0}
+.mascot.sm .mimg,.mascot.sm .memoji{width:64px;height:64px;font-size:44px}
+.mascot.sm .bubble{font-size:15px;padding:8px 12px}
+/* 動き */
+.mv-welcome{animation:float 2.4s ease-in-out infinite}
+.mv-happy{animation:bounce .7s ease-out 2}
+.mv-cheer{animation:jump .6s ease-in-out 3}
+.mv-oops{animation:shake .5s ease-in-out 1}
+.mv-sad{animation:droop 1.6s ease-in-out infinite}
+.mv-hint{animation:nod 1s ease-in-out 2}
+.mv-explain{animation:float 2.4s ease-in-out infinite}
+.mv-think{animation:tilt 1.8s ease-in-out infinite}
+.mv-write{animation:scribble 1s ease-in-out infinite}
+.mv-read{animation:float 2.4s ease-in-out infinite}
+.mv-sleep{animation:breathe 2.6s ease-in-out infinite}
+.mv-surprise{animation:popin .5s cubic-bezier(.2,1.6,.4,1) 1}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-14px) scale(1.04)}60%{transform:translateY(0) scale(.97,1.03)}}
+@keyframes jump{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-18px) rotate(-6deg)}60%{transform:translateY(-10px) rotate(6deg)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px) rotate(-4deg)}40%{transform:translateX(6px) rotate(4deg)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes droop{0%,100%{transform:rotate(0) translateY(0)}50%{transform:rotate(-5deg) translateY(3px)}}
+@keyframes nod{0%,100%{transform:rotate(0)}30%{transform:rotate(8deg) translateY(-3px)}60%{transform:rotate(-3deg)}}
+@keyframes tilt{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes scribble{0%,100%{transform:translate(0,0)}25%{transform:translate(2px,-2px)}50%{transform:translate(-2px,1px)}75%{transform:translate(1px,2px)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes popin{0%{transform:scale(.6)}100%{transform:scale(1)}}
+@keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){.mascot *{animation:none!important}}
 </style>
 
 <div class="cover" id="cover" onclick="document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.png" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
@@ -262,6 +296,25 @@ const KS = {}; Object.keys(KANJI).forEach(k => (KS[KANJI[k].g] = KS[KANJI[k].g]|
 Object.values(KS).forEach(a => a.sort((x,y) => (KANJI[x].f||9999)-(KANJI[y].f||9999)));
 
 /* ======================= 保存 ======================= */
+/* ======================= マスコット（キャラクター） ======================= */
+const MASCOT = {emoji:'🦉', name:'ふくせんせい'};
+const LINES = {
+  welcome:['きょうも いっしょに がんばろう','まってたよ！','きょうは なにから やる？'],
+  happy:['せいかい！','いいね！','その ちょうし！','ばっちり！','やったね！'],
+  cheer:['すごい！ 3れんぞく！','さいこう！','キラキラ してるよ！'],
+  oops:['おしい！ もういちど','だいじょうぶ。つぎは できる','ここで おぼえれば OK！'],
+  sad:['むずかしいね…。いっしょに ゆっくり みよう','あせらなくて いいよ。もういちど'],
+  hint:['ヒントだよ','ここに ちゅうもく！'],
+  explain:['なるほど！ ここが ポイント','おぼえかたの コツだよ'],
+  think:['うーん、どれかな？','じっくり かんがえよう'],
+  write:['ゆっくり ていねいに かこう','●から はじめてね'],
+  read:['こえに だして よんでみよう','どれかな？'],
+  sleep:['おつかれさま！ よく がんばったね','きょうは ここまで。また あしたね'],
+  surprise:['わあ！ あたらしい バッジ！','びっくり！ すごい きろく！'],
+};
+function mascot(expr, text, cls=''){ const arr = LINES[expr]||LINES.happy; const t = text || arr[Math.floor(Math.random()*arr.length)];
+  return `<div class="mascot ${cls}"><img class="mimg mv-${expr}" src="chara/${expr}.png" alt="" onerror="this.outerHTML='<span class=&quot;memoji mv-${expr}&quot;>${MASCOT.emoji}</span>'"><div class="bubble">${t}</div></div>`; }
+function greeting(){ const h=new Date().getHours(); return h<10?'おはよう！':h<17?'こんにちは！':'こんばんは！'; }
 /* ======================= プロフィール（REI / RU） ======================= */
 const PROFILES = {ra:{name:'RA', emoji:'⭐'}, rei:{name:'REI', emoji:'🌸'}, ru:{name:'RU', emoji:'🐣'}};
 let PROFILE = null;
@@ -556,7 +609,8 @@ function viewHome(){
   const weakAll = Object.keys(S.srs).filter(isWeak).length;
   const todayN = S.dailyAll[today()]||0, goal = S.dailyGoal||20; const pct = Math.min(100, Math.round(todayN/goal*100)); const doneToday = todayN >= goal;
   const tot = totalAnswered(), km = totalMastered(), days = studyDays();
-  const goalCard = `<div class="card">
+  const greet = doneToday ? mascot('cheer', greeting()+' きょうは もう ばっちり！') : (due>0 ? mascot('welcome', greeting()+' ふくしゅうが '+due+'もん まってるよ') : mascot('welcome', greeting()+' あたらしい もんだいに ちょうせん！'));
+  const goalCard = greet + `<div class="card">
    <div class="goal"><div class="ring" style="background:conic-gradient(var(--ok) ${pct}%, var(--line) 0)"><span>${pct}%</span></div>
     <div><div style="font-size:17px;font-weight:800">きょうの ゴール：${todayN} / ${goal}もん</div><div class="muted">${doneToday?'たっせい！ もっと やっても いいよ':'あと '+(goal-todayN)+'もんで たっせい'}</div>
     <div class="row" style="margin-top:8px"><button class="btn ${doneToday?'sec':''}" id="startToday">▶ ${doneToday?'もっと れんしゅう':'きょうの れんしゅう'}</button>${weakAll?'<button class="btn ghost sm" id="startWeak">🔥 にがてだけ</button>':''}</div></div></div>
@@ -661,7 +715,7 @@ function endSession(){
   const n = SES.results.length, c = SES.correct; const xp = c*4 + SES.startedNew*2; addXP(xp); touchStreak(); render();
   const t = today(); S.introduced[t] = (S.introduced[t]||0) + SES.startedNew; S.log.push({date:t, n, c, mode:SES.mode}); S.log = S.log.slice(-200); save();
   const todayN = S.dailyAll[today()]||0, goal = S.dailyGoal||20;
-  openModal(`<h2>おつかれさま！</h2><div class="big">${c} / ${n}</div><p class="muted" style="text-align:center">せいかい ${n?Math.round(c/n*100):0}%　+${xp} XP${SES.startedNew?'　あたらしい もんだい '+SES.startedNew:''}</p>
+  openModal(mascot(todayN>=goal?'cheer':'sleep') + `<h2>おつかれさま！</h2><div class="big">${c} / ${n}</div><p class="muted" style="text-align:center">せいかい ${n?Math.round(c/n*100):0}%　+${xp} XP${SES.startedNew?'　あたらしい もんだい '+SES.startedNew:''}</p>
    ${todayN>=goal?'<div class="done-banner">🎉 きょうの ゴール たっせい！（'+todayN+'もん）</div>':'<p style="text-align:center;font-weight:700">きょう '+todayN+' / '+goal+'もん　あと '+(goal-todayN)+'もん</p>'}
    ${SES.results.filter(r=>!r.ok).length?'<h3>まちがえた問題（あとで また出ます）</h3><div class="weaklist">'+SES.results.filter(r=>!r.ok).map(r=>`<div class="w"><span><span class="tag">${plain(TYPES[r.item.type].name)}</span> <span class="k">${esc(keyLabel(r.item))}</span></span><span class="muted">${rb(r.explain)}</span></div>`).join('')+'</div>':''}
    <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">もどる</button></div>`);
@@ -687,7 +741,7 @@ function endTest(){
   const weak = Object.keys(byType).filter(t => byType[t].c/byType[t].n < 0.6).map(t=>plain(TYPES[t].name)).join('・');
   const mins = Math.round((Date.now()-TEST.start)/60000);
   S.tests.push({date:today(), level:lv.id, score, weak}); S.tests = S.tests.slice(-50); addXP(c*3); touchStreak(); save(); render();
-  openModal(`<h2>${lv.name} 模擬テスト 結果</h2><div class="big">${score}%</div><p style="text-align:center;font-size:18px;font-weight:700">${score>=lv.pass?'🎉 合格ラインを超えました':'合格ラインまで あと '+(lv.pass-score)+'%'}</p><p class="muted" style="text-align:center">${c} / ${n} 問正解・${mins}分</p>
+  openModal(mascot(score>=lv.pass?'cheer':'think', score>=lv.pass?'ごうかくライン とっぱ！ すごい！':'あと すこし！ にがてを つぶそう') + `<h2>${lv.name} 模擬テスト 結果</h2><div class="big">${score}%</div><p style="text-align:center;font-size:18px;font-weight:700">${score>=lv.pass?'🎉 合格ラインを超えました':'合格ラインまで あと '+(lv.pass-score)+'%'}</p><p class="muted" style="text-align:center">${c} / ${n} 問正解・${mins}分</p>
    <table class="tb"><tr><th>分野</th><th>正解</th><th>正答率</th></tr>${Object.keys(byType).map(t=>`<tr><td>${rb(TYPES[t].name)}</td><td>${byType[t].c}/${byType[t].n}</td><td ${byType[t].c/byType[t].n<0.6?'style="color:var(--ng)"':''}>${Math.round(byType[t].c/byType[t].n*100)}%</td></tr>`).join('')}</table>
    <p class="muted">まちがえた問題は反復のキューに入りました。「きょうの学習」で出ます。</p>
    <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" onclick="closeModal()">もどる</button></div>`);
@@ -747,8 +801,11 @@ function revealAns(){ $('#cw').classList.add('reveal'); $('#wbtns').innerHTML = 
 function finish(ok, msg){
   const q = CUR; const g = level().grade;
   if(q.sent){ const se = document.querySelector('.q .sent'); if(se) se.innerHTML = renderMarkup(q.sent, g, {mode:'show', furTarget:true, allFur:true}); }
-  const ins = q.insight ? q.insight() : '';
-  const fb = $('#fb'); if(fb) fb.innerHTML = `<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ せいかい！':'❌ '+esc(msg)}　<span>${rb(q.explain)}</span>${q.item.k&&STROKES[q.item.k]?` <button class="btn ghost sm" onclick="showKanjiCard('${q.item.k}')">かんじカード</button>`:''}</div>${ins}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="nextbtn" onclick="proceed()">つぎへ →</button></div>`;
+  const ins = q.insight ? (mascot('explain', null, 'sm') + q.insight()) : '';
+  if(SES){ SES.streakOk = ok ? (SES.streakOk||0)+1 : 0; }
+  const wasWrong = SES && SES.cur && SES.cur.wrong > 0;
+  const mexpr = ok ? ((SES && SES.streakOk>=3 && SES.streakOk%3===0) ? 'cheer' : 'happy') : (wasWrong || isWeak(q.item.id) ? 'sad' : 'oops');
+  const fb = $('#fb'); if(fb) fb.innerHTML = mascot(mexpr, null, 'sm') + `<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ せいかい！':'❌ '+esc(msg)}　<span>${rb(q.explain)}</span>${q.item.k&&STROKES[q.item.k]?` <button class="btn ghost sm" onclick="showKanjiCard('${q.item.k}')">かんじカード</button>`:''}</div>${ins}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="nextbtn" onclick="proceed()">つぎへ →</button></div>`;
   CUR.ok = ok; const nb=$('#nextbtn'); if(nb) nb.scrollIntoView({block:'nearest'});
   // 正解でも自動では進めない（解説を読めるように）
 }
