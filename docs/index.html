@@ -226,7 +226,7 @@ pre{background:var(--bg);padding:10px;border-radius:8px;font-size:12px;white-spa
 .sndbtn{border:2px solid var(--line);background:var(--card);border-radius:14px;padding:5px 10px;font-size:15px}
 </style>
 
-<div class="cover" id="cover" onclick="sndUnlock(); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.jpg" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
+<div class="cover" id="cover" onclick="sndUnlock(); bgm('title'); sfx('tap'); document.getElementById('cover').classList.remove('on'); choosePicker();"><div class="ph"></div><img src="cover.jpg" alt="" onerror="this.remove()"><div class="cv-title">よんで かいて 漢検<small>READ · WRITE · KANKEN</small></div><div class="tap">タップして はじめる</div></div>
 <div class="picker" id="picker"><h1>だれが やる？</h1><div class="who"><button class="ra" data-who="ra"><span>⭐</span>RA</button><button class="rei" data-who="rei"><span>🌸</span>REI</button><button class="ru" data-who="ru"><span>🐣</span>RU</button></div></div>
 <header>
   <div class="hrow">
@@ -299,7 +299,7 @@ Object.values(KS).forEach(a => a.sort((x,y) => (KANJI[x].f||9999)-(KANJI[y].f||9
 
 /* ======================= 保存 ======================= */
 /* ======================= 音（BGM・効果音） ======================= */
-const SOUND_FILES = ['bgm_home','bgm_play','sfx_tap','sfx_correct','sfx_wrong','sfx_cheer','sfx_badge','sfx_end','sfx_goal','sfx_stroke_ok','sfx_stroke_ng'];
+const SOUND_FILES = ['bgm_title','bgm_home','bgm_play','sfx_tap','sfx_correct','sfx_wrong','sfx_cheer','sfx_badge','sfx_end','sfx_goal','sfx_stroke_ok','sfx_stroke_ng'];
 const SND = {ctx:null, have:{}, buf:{}, bgmEl:null, cur:null, unlocked:false};
 async function sndProbe(){ await Promise.all(SOUND_FILES.map(async n => { try{ const r = await fetch('sound/'+n+'.mp3', {method:'HEAD'}); SND.have[n] = r.ok; }catch(e){ SND.have[n]=false; } })); }
 function sndUnlock(){ if(SND.unlocked) return; SND.unlocked=true; try{ SND.ctx = new (window.AudioContext||window.webkitAudioContext)(); SND.ctx.resume(); }catch(e){}
@@ -329,7 +329,8 @@ function synth(name){ if(!SND.ctx) return; switch(name){
   case 'stroke_ng': tone(260,0,0.12,'triangle',0.08); break;
 } }
 function bgm(track){ // 'home' | 'play' | null  — WebAudio で切れ目なくループ
-  const n = track ? 'bgm_'+track : null;
+  let n = track ? 'bgm_'+track : null;
+  if(n==='bgm_title' && !SND.have[n]) n = 'bgm_home';  // 表紙専用曲が無ければホームの曲
   if(soundMode()!=='all' || !n || !SND.have[n] || !SND.ctx){ bgmStop(); return; }
   if(SND.cur===n){ bgmGainTo(0.35); return; }
   SND.cur = n; bgmStop(true);
