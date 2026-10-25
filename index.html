@@ -313,17 +313,25 @@ function synth(name){ if(!SND.ctx) return; switch(name){
   case 'stroke_ok': tone(1319,0,0.08,'sine',0.1); break;
   case 'stroke_ng': tone(260,0,0.12,'triangle',0.08); break;
 } }
-function bgm(track){ // 'home' | 'play' | null
-  if(!SND.bgmEl) return; const n = track ? 'bgm_'+track : null;
-  if(soundMode()!=='all' || !n || !SND.have[n]){ SND.cur=null; fadeTo(0, true); return; }
-  if(SND.cur===n){ fadeTo(0.35); return; }
-  SND.cur = n; SND.bgmEl.src = 'sound/'+n+'.mp3'; SND.bgmEl.volume = 0; SND.bgmEl.play().catch(()=>{}); fadeTo(0.35);
+function bgm(track){ // 'home' | 'play' | null  — WebAudio で切れ目なくループ
+  const n = track ? 'bgm_'+track : null;
+  if(soundMode()!=='all' || !n || !SND.have[n] || !SND.ctx){ bgmStop(); return; }
+  if(SND.cur===n){ bgmGainTo(0.35); return; }
+  SND.cur = n; bgmStop(true);
+  sfxBuffer(n).then(buf => { if(!buf || SND.cur!==n) return;
+    // 先頭・末尾の無音（MP3 のエンコード余白）を検出してループ区間にする
+    const d = buf.getChannelData(0), sr = buf.sampleRate, th = 0.004; let s=0, e=d.length-1;
+    while(s<d.length && Math.abs(d[s])<th) s++; while(e>s && Math.abs(d[e])<th) e--;
+    const src = SND.ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.loopStart = s/sr; src.loopEnd = (e+1)/sr;
+    const g = SND.ctx.createGain(); g.gain.value = 0; src.connect(g).connect(SND.ctx.destination); src.start(0, s/sr);
+    SND.bgmSrc = src; SND.bgmGain = g; bgmGainTo(0.35); });
 }
-let fadeTimer=null;
-function fadeTo(v, pauseAtZero){ clearInterval(fadeTimer); const el=SND.bgmEl; if(!el) return; fadeTimer=setInterval(()=>{ const d=v-el.volume; if(Math.abs(d)<0.03){ el.volume=v; clearInterval(fadeTimer); if(v===0 && pauseAtZero){ el.pause(); } return; } el.volume = Math.max(0, Math.min(1, el.volume + Math.sign(d)*0.03)); }, 60); }
+function bgmGainTo(v){ if(!SND.bgmGain) return; const g=SND.bgmGain.gain, t=SND.ctx.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(v, t+0.8); }
+function bgmStop(immediate){ const src=SND.bgmSrc, g=SND.bgmGain; SND.bgmSrc=null; SND.bgmGain=null; if(!immediate) SND.cur=null; if(!src) return; try{ const t=SND.ctx.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value,t); g.gain.linearRampToValueAtTime(0, t+0.6); src.stop(t+0.65); }catch(e){} }
 function cycleSound(){ const m = soundMode(); S.sound = m==='all'?'sfx':m==='sfx'?'off':'all'; save(); renderHeader(); if(S.sound==='all') bgm(SES||TEST||(typeof TR!=='undefined'&&TR)?'play':'home'); else bgm(null); if(S.sound!=='off') sfx('tap'); }
 function soundIcon(){ const m=soundMode(); return m==='all'?'🎵':m==='sfx'?'🔔':'🔇'; }
 sndProbe();
+document.addEventListener('visibilitychange', () => { if(!document.hidden && SND.ctx && SND.ctx.state==='suspended') SND.ctx.resume(); });
 /* ======================= マスコット（キャラクター） ======================= */
 const MASCOT = {emoji:'🦉', name:'ふくせんせい'};
 const LINES = {
